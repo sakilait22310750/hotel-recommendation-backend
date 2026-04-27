@@ -1396,11 +1396,15 @@ def get_drive_service():
     Supports Service Account authentication via environment variable JSON or file.
     """
     try:
-        # 1. Try GOOGLE_CREDENTIALS_JSON (recommended for Railway)
         creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
         if creds_json:
             import json
             info = json.loads(creds_json)
+            
+            # Fix mangled private keys (common when copy-pasting into Railway)
+            if 'private_key' in info and isinstance(info['private_key'], str):
+                info['private_key'] = info['private_key'].replace('\\n', '\n')
+            
             credentials = service_account.Credentials.from_service_account_info(
                 info,
                 scopes=['https://www.googleapis.com/auth/drive.readonly']
