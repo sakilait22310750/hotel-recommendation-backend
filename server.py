@@ -1392,23 +1392,40 @@ drive_executor = ThreadPoolExecutor(max_workers=5)
 # Google Drive API setup
 def get_drive_service():
     """
-    Initialize and return Google Drive API service
-    Supports Service Account authentication (recommended for server-to-server)
+    Initialize and return Google Drive API service.
+    Supports Service Account authentication via environment variable JSON or file.
     """
     try:
-        # Service Account authentication
-        # Set GOOGLE_APPLICATION_CREDENTIALS env var to path of service account JSON
+        # 1. Try GOOGLE_CREDENTIALS_JSON (recommended for Railway)
+        creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+        if creds_json:
+            import json
+            info = json.loads(creds_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                info,
+                scopes=['https://www.googleapis.com/auth/drive.readonly']
+            )
+            return build('drive', 'v3', credentials=credentials)
+
+        # 2. Try GOOGLE_APPLICATION_CREDENTIALS (file path)
         credentials_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
         if credentials_path and os.path.exists(credentials_path):
             credentials = service_account.Credentials.from_service_account_file(
                 credentials_path,
                 scopes=['https://www.googleapis.com/auth/drive.readonly']
             )
-            service = build('drive', 'v3', credentials=credentials)
-            return service
+            return build('drive', 'v3', credentials=credentials)
         
-        # If no credentials found, return None
-        logger.warning("Google Drive credentials not found. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.")
+        # 3. Default path
+        default_path = ROOT_DIR / 'service-account-key.json'
+        if default_path.exists():
+            credentials = service_account.Credentials.from_service_account_file(
+                str(default_path),
+                scopes=['https://www.googleapis.com/auth/drive.readonly']
+            )
+            return build('drive', 'v3', credentials=credentials)
+
+        logger.warning("Google Drive credentials not found (checked GOOGLE_CREDENTIALS_JSON, GOOGLE_APPLICATION_CREDENTIALS, and default file)")
         return None
         
     except GoogleAuthError as e:
