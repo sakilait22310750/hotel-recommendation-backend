@@ -757,7 +757,7 @@ async def get_hotels(location: Optional[str] = None, min_rating: Optional[float]
         query['rating'] = {"$gte": min_rating}
     
     hotels = await db.hotels.find(query).limit(limit).to_list(limit)
-    base_url = os.environ.get("BACKEND_URL", "http://localhost:8000")
+    base_url = os.environ.get("BACKEND_URL", "http://localhost:8000").strip().rstrip('/')
     
     return [
         {
@@ -792,7 +792,7 @@ async def search_hotels_suggestions(q: str = "", limit: int = 8):
         ]
     }
     hotels = await db.hotels.find(query).limit(limit).to_list(limit)
-    base_url = os.environ.get("BACKEND_URL", "http://localhost:8000")
+    base_url = os.environ.get("BACKEND_URL", "http://localhost:8000").strip().rstrip('/')
     return [
         {
             "hotel_id":  h["hotel_id"],
