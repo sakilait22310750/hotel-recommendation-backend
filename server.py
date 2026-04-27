@@ -1393,51 +1393,67 @@ drive_executor = ThreadPoolExecutor(max_workers=5)
 def get_drive_service():
     """
     Initialize and return Google Drive API service.
-    Supports Service Account authentication via environment variable JSON or file.
+    Priority:
+    1. GOOGLE_DRIVE_API_KEY (simplest - no JWT, works with public folders)
+    2. GOOGLE_CREDENTIALS_BASE64 (base64-encoded service account JSON)
+    3. GOOGLE_CREDENTIALS_JSON (raw JSON string)
+    4. Local service-account-key.json file
     """
     try:
-        # 1. Try GOOGLE_CREDENTIALS_BASE64 (most robust for Railway)
+        # 1. API Key approach (no JWT - most reliable for public folders)
+        api_key = os.environ.get('GOOGLE_DRIVE_API_KEY')
+        if api_key:
+            service = build('drive', 'v3', developerKey=api_key)
+            logger.info("✅ Google Drive initialized with API key (no JWT)")
+            return service
+
+        # 2. Base64-encoded service account JSON
         creds_b64 = os.environ.get('GOOGLE_CREDENTIALS_BASE64')
         if creds_b64:
             import base64
-            import json
-            decoded_creds = base64.b64decode(creds_b64).decode('utf-8')
-            info = json.loads(decoded_creds)
+            import json as _json
+            decoded = base64.b64decode(creds_b64).decode('utf-8')
+            info = _json.loads(decoded)
+            # Normalize private key line endings (fix Windows CRLF issues)
+            if 'private_key' in info:
+                info['private_key'] = info['private_key'].replace('\r\n', '\n').replace('\\n', '\n')
             credentials = service_account.Credentials.from_service_account_info(
-                info,
-                scopes=['https://www.googleapis.com/auth/drive.readonly']
+                info, scopes=['https://www.googleapis.com/auth/drive.readonly']
             )
+            logger.info("✅ Google Drive initialized with Base64 credentials")
             return build('drive', 'v3', credentials=credentials)
 
-        # 2. Try GOOGLE_CREDENTIALS_JSON (fallback)
+        # 3. Raw JSON string from environment
         creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
-
-        # 2. Try GOOGLE_APPLICATION_CREDENTIALS (file path)
-        credentials_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-        if credentials_path and os.path.exists(credentials_path):
-            credentials = service_account.Credentials.from_service_account_file(
-                credentials_path,
-                scopes=['https://www.googleapis.com/auth/drive.readonly']
+        if creds_json:
+            import json as _json
+            info = _json.loads(creds_json)
+            if 'private_key' in info:
+                info['private_key'] = info['private_key'].replace('\r\n', '\n').replace('\\n', '\n')
+            credentials = service_account.Credentials.from_service_account_info(
+                info, scopes=['https://www.googleapis.com/auth/drive.readonly']
             )
+            logger.info("✅ Google Drive initialized with JSON credentials")
             return build('drive', 'v3', credentials=credentials)
-        
-        # 3. Default path
+
+        # 4. Local file
         default_path = ROOT_DIR / 'service-account-key.json'
         if default_path.exists():
             credentials = service_account.Credentials.from_service_account_file(
                 str(default_path),
                 scopes=['https://www.googleapis.com/auth/drive.readonly']
             )
+            logger.info("✅ Google Drive initialized with local key file")
             return build('drive', 'v3', credentials=credentials)
 
-        logger.warning("Google Drive credentials not found (checked GOOGLE_CREDENTIALS_JSON, GOOGLE_APPLICATION_CREDENTIALS, and default file)")
+        logger.warning("❌ No Google Drive credentials found")
         return None
-        
+
     except GoogleAuthError as e:
-        logger.error(f"Google Drive authentication error: {e}")
+        logger.error(f"❌ Google Drive auth error: {e}")
         return None
     except Exception as e:
-        logger.error(f"Error initializing Google Drive service: {e}")
+        logger.error(f"❌ Google Drive init error: {e}")
         return None
 
 def _find_hotel_folder_id_sync(drive_service, parent_folder_id: str, hotel_id: str) -> Optional[str]:
