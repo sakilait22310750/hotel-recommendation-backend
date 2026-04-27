@@ -1,0 +1,7 @@
+# Don't upload these to Railway (too large or not needed)
+venv/
+__pycache__/
+*.pyc
+.env
+users.db
+reviews_with_nlp_features.xlsx

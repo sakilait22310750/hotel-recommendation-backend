@@ -1,0 +1,29 @@
+# Environment variables (NEVER commit these)
+.env
+
+# Google service account key (NEVER commit this)
+service-account-key.json
+
+# Large data/model files (too big for GitHub 100MB limit)
+train_df.pkl
+hotels_data.json
+reviews_with_nlp_features.xlsx
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+*.venv/
+.venv/
+
+# Local DB
+users.db
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
