@@ -1207,6 +1207,40 @@ async def get_hotel_details(hotel_id: int):
     }
 
 
+@api_router.post("/hotels/{hotel_id}/reviews")
+async def submit_hotel_review(hotel_id: int, review: dict):
+    """
+    Submit a user review for a hotel.
+    Stores the review in the hotel's reviews array in MongoDB.
+    """
+    hotel = await db.hotels.find_one({"hotel_id": hotel_id})
+    if not hotel:
+        raise HTTPException(status_code=404, detail="Hotel not found")
+
+    new_review = {
+        "review_text": review.get("review_text", "").strip(),
+        "rating": review.get("rating", 5),
+        "user_name": review.get("user_name", "Guest"),
+        "date_of_review": review.get("date_of_review", datetime.utcnow().isoformat()),
+        "sentiment_label": "positive",   # default label for user reviews
+        "sentiment_score": min(1.0, review.get("rating", 5) / 5.0),
+        "user_submitted": True,
+    }
+
+    if not new_review["review_text"]:
+        raise HTTPException(status_code=400, detail="review_text is required")
+
+    await db.hotels.update_one(
+        {"hotel_id": hotel_id},
+        {
+            "$push": {"reviews": {"$each": [new_review], "$position": 0}},
+            "$inc": {"total_reviews": 1},
+        }
+    )
+    logger.info(f"[Review] New review submitted for hotel_id={hotel_id}")
+    return {"message": "Review submitted successfully", "review": new_review}
+
+
 
 @api_router.post("/recommendations")
 async def get_recommendations(request: RecommendationRequest, current_user: Optional[dict] = Depends(get_current_user_optional)):
